@@ -1,0 +1,17 @@
+{
+  "name": "air-checker-bot",
+  "version": "1.0.0",
+  "description": "Bot de Discord para el server de Air Checker: /check, /purge y !drophere para los hits del checker",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.28.1",
+    "dotenv": "^18.0.10"
+  }
+}
