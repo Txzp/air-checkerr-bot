@@ -29,6 +29,7 @@ Tras un reinicio el bot recupera el canal solo (busca su webhook *Air Checker Dr
 4. `npm install`, copia `.env.example` a `.env`, rellena y `npm start`.
 
 ### Render
-- Build: `npm install` · Start: `npm start`
+- New > **Web Service** > conecta este repo
+- Build: `npm install` · Start: `npm start` · Plan: Free
 - Variables: `DISCORD_TOKEN`, `GUILD_ID`, `HIT_ROLE_ID`
-- UptimeRobot a la URL del servicio para que no se duerma.
+- No hace falta UptimeRobot: el bot se auto-pinguea cada 10 min con `RENDER_EXTERNAL_URL` (Render la pone solo).

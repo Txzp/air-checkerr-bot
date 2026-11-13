@@ -340,5 +340,15 @@ http.createServer((req, res) => {
   res.end(client.isReady() ? 'Air Checker Bot online' : 'starting');
 }).listen(PORT, () => console.log(`Keep-alive en el puerto ${PORT}`));
 
+// Auto-ping: Render free duerme el servicio tras 15 min sin visitas. Render pone RENDER_EXTERNAL_URL solo,
+// así que el bot se visita a sí mismo cada 10 min y no hace falta UptimeRobot.
+const SELF_URL = process.env.RENDER_EXTERNAL_URL || process.env.SELF_URL;
+if (SELF_URL) {
+  setInterval(() => {
+    fetch(SELF_URL, { signal: AbortSignal.timeout(15000) }).catch(() => {});
+  }, 10 * 60 * 1000);
+  console.log(`Auto-ping activo -> ${SELF_URL}`);
+}
+
 process.on('unhandledRejection', e => console.error('unhandledRejection:', e));
 client.login(TOKEN);
