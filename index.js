@@ -1,7 +1,8 @@
 // Air Checker Bot — drops de usernames para el server de Air Checker
 // Comandos:
 //   /check username   -> mira si un username de Discord está libre:  `@username` > Available / Taken
-//   /purge [canal] [cantidad] -> vacía un canal (todo, o los últimos N mensajes)
+//   /purge [canal] [cantidad] -> vacía un canal (todo, o los últimos N mensajes). Solo el rol PURGE_ROLE_ID
+//   Auto rol         -> cada miembro nuevo recibe HIT_ROLE_ID
 //   !drophere         -> este canal pasa a ser el de drops. El bot crea un webhook aquí y te lo manda por DM:
 //                        ese link va en webhook.txt del checker. Cada hit que mande el checker, el bot lo
 //                        borra y lo vuelve a publicar como embed mencionando el rol de drops.
@@ -17,7 +18,8 @@ const {
 
 const TOKEN = process.env.DISCORD_TOKEN;
 const GUILD_ID = process.env.GUILD_ID || '';              // opcional: registra los slash al instante en ese server
-const HIT_ROLE_ID = process.env.HIT_ROLE_ID || '1570697678977769502';
+const HIT_ROLE_ID = process.env.HIT_ROLE_ID || '1570697678977769502';    // rol que se menciona en cada hit y se da al entrar
+const PURGE_ROLE_ID = process.env.PURGE_ROLE_ID || '1570183686207574037'; // único rol que puede usar /purge
 const CHECKER_DIR = process.env.CHECKER_DIR || '';        // opcional: si el bot corre en tu PC, escribe webhook.txt solo
 const PREFIX = '!';
 const HOOK_NAME = 'Air Checker Drops';
@@ -36,6 +38,7 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,   // hay que activarlo en el Developer Portal (Bot > Privileged Gateway Intents)
     GatewayIntentBits.GuildWebhooks,
+    GatewayIntentBits.GuildMembers,     // privilegiado: Server Members Intent (para el auto rol)
   ],
   partials: [Partials.Channel],
 });
@@ -56,7 +59,6 @@ const commands = [
   new SlashCommandBuilder()
     .setName('purge')
     .setDescription('Vacía los mensajes de un canal')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
     .setContexts(InteractionContextType.Guild)
     .addChannelOption(o => o.setName('canal').setDescription('Canal a vaciar (por defecto este)')
       .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
@@ -124,6 +126,9 @@ async function onCheck(interaction) {
 
 // ---------------- purge ----------------
 async function onPurge(interaction) {
+  if (!interaction.member?.roles?.cache?.has(PURGE_ROLE_ID)) {
+    return interaction.reply({ content: `Solo <@&${PURGE_ROLE_ID}> puede usar \`/purge\`.`, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } });
+  }
   const channel = interaction.options.getChannel('canal') || interaction.channel;
   const amount = interaction.options.getInteger('cantidad');
 
@@ -268,14 +273,15 @@ async function pumpHits() {
     const embed = new EmbedBuilder()
       .setColor(COLOR)
       .setTitle('Hit')
-      .addFields({ name: 'Discord Username', value: `\`@${name}\`` })
-      .setFooter({ text: 'Air Checker' })
-      .setTimestamp();
-    await channel.send({
-      content: `<@&${HIT_ROLE_ID}> Hit \`@${name}\``,
+      .setDescription(`\`@${name}\`\n<@&${HIT_ROLE_ID}>`);
+    // Una mención dentro de una embed no notifica. Truco: se manda con el rol en el texto (eso hace el ping)
+    // y al instante se edita para dejar solo la embed. La notificación ya llegó.
+    const msg = await channel.send({
+      content: `<@&${HIT_ROLE_ID}>`,
       embeds: [embed],
       allowedMentions: { roles: [HIT_ROLE_ID] },
-    }).catch(e => console.error('No pude mandar el hit:', e.message));
+    }).catch(e => { console.error('No pude mandar el hit:', e.message); return null; });
+    if (msg) await msg.edit({ content: '', embeds: [embed] }).catch(() => {});
   }
   pumping = false;
 }
@@ -323,6 +329,13 @@ client.on('messageCreate', async message => {
       message.reply('No pude configurar el canal: ' + e.message).catch(() => {});
     }
   }
+});
+
+// Auto rol: todo el que entra recibe el rol de hits
+client.on('guildMemberAdd', async member => {
+  if (member.user.bot) return;
+  await member.roles.add(HIT_ROLE_ID, 'Auto rol de Air Checker')
+    .catch(e => console.error(`No pude dar el rol a ${member.user.tag}:`, e.message));
 });
 
 // Si alguien borra el webhook a mano, se olvida el canal

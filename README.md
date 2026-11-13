@@ -5,7 +5,8 @@ Bot del server de **Air Checker** para drops de usernames.
 | Comando | Qué hace |
 |---|---|
 | `/check username` | Responde `` `@username` > Available `` o `` Taken `` |
-| `/purge [canal] [cantidad]` | Vacía el canal entero (o los últimos N). Los fijados se quedan. Necesita *Gestionar mensajes* |
+| `/purge [canal] [cantidad]` | Vacía el canal entero (o los últimos N). Los fijados se quedan. Solo el rol `PURGE_ROLE_ID` |
+| Auto rol | Cada miembro nuevo recibe `HIT_ROLE_ID` |
 | `!drophere` | Ese canal pasa a ser el de drops (solo admins) |
 
 ## Cómo llegan los hits
@@ -14,7 +15,7 @@ Bot del server de **Air Checker** para drops de usernames.
 2. El bot crea un webhook ahí y te lo manda por **DM**.
 3. Pega ese link en `webhook.txt` de tu checker (o pon `CHECKER_DIR` y lo escribe solo).
 4. Cada hit del checker cae en el canal; el bot lo borra y lo publica como embed:
-   `@rol Hit `@username`` + embed *Discord Username*.
+   una embed *Hit* con `@username` y el rol (el rol hace ping).
 
 No hace falta tocar el checker: el bot lee cualquier mensaje del webhook con `` `nombre` ``.
 Tras un reinicio el bot recupera el canal solo (busca su webhook *Air Checker Drops*).
@@ -22,14 +23,14 @@ Tras un reinicio el bot recupera el canal solo (busca su webhook *Air Checker Dr
 ## Setup
 
 1. [Developer Portal](https://discord.com/developers/applications) > tu app > **Bot**:
-   activa **Message Content Intent**.
+   activa **Message Content Intent** y **Server Members Intent**.
 2. Invita el bot con permisos: Ver canales, Enviar mensajes, Insertar enlaces, Gestionar mensajes,
-   Leer historial, Gestionar webhooks, Mencionar @everyone/roles (scope `bot` + `applications.commands`).
-3. El rol del bot tiene que poder mencionar el rol de hits (o marca el rol como *mencionable*).
+   Leer historial, Gestionar webhooks, Mencionar @everyone/roles, Gestionar roles (scope `bot` + `applications.commands`).
+3. El rol del bot tiene que estar **por encima** del rol de hits (para darlo) y poder mencionarlo (o márcalo como *mencionable*).
 4. `npm install`, copia `.env.example` a `.env`, rellena y `npm start`.
 
 ### Render
 - New > **Web Service** > conecta este repo
 - Build: `npm install` · Start: `npm start` · Plan: Free
-- Variables: `DISCORD_TOKEN`, `GUILD_ID`, `HIT_ROLE_ID`
+- Variables: `DISCORD_TOKEN`, `GUILD_ID`, `HIT_ROLE_ID`, `PURGE_ROLE_ID`
 - No hace falta UptimeRobot: el bot se auto-pinguea cada 10 min con `RENDER_EXTERNAL_URL` (Render la pone solo).
