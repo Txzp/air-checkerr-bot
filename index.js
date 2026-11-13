@@ -206,58 +206,55 @@ function writeCheckerWebhook(url) {
   }
 }
 
+// !drophere no escribe NADA en el canal: borra el comando y todo (webhook, errores) va por DM.
+function dmEmbed(desc, title) {
+  const e = new EmbedBuilder().setColor(COLOR).setDescription(desc);
+  if (title) e.setTitle(title);
+  return { embeds: [e] };
+}
+
 async function onDropHere(message) {
-  const member = message.member;
-  if (!member?.permissions.has(PermissionFlagsBits.ManageGuild)) {
-    return message.reply('Solo admins (Gestionar servidor) pueden usar `!drophere`.').catch(() => {});
-  }
+  const author = message.author;
   const channel = message.channel;
-  const me = message.guild.members.me;
-  const perms = channel.permissionsFor(me);
+  await message.delete().catch(() => {});
+
+  if (!message.member?.permissions.has(PermissionFlagsBits.ManageGuild)) {
+    return author.send(dmEmbed('Solo admins (Gestionar servidor) pueden usar `!drophere`.')).catch(() => {});
+  }
+  const perms = channel.permissionsFor(message.guild.members.me);
   if (!perms?.has([PermissionFlagsBits.ManageWebhooks, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.ManageMessages])) {
-    return message.reply('Me faltan permisos en este canal: **Gestionar webhooks, Enviar mensajes, Insertar enlaces y Gestionar mensajes**.').catch(() => {});
+    return author.send(dmEmbed(`Me faltan permisos en <#${channel.id}>: **Gestionar webhooks, Enviar mensajes, Insertar enlaces y Gestionar mensajes**.`)).catch(() => {});
   }
 
-  // Quita los webhooks de drops viejos (de este u otro canal) para que solo haya uno
+  const hook = await channel.createWebhook({ name: HOOK_NAME, reason: `!drophere por ${author.tag}` });
+  const wrote = writeCheckerWebhook(hook.url);
+
+  const sent = await author.send(dmEmbed(
+    `📍 Canal de drops: <#${channel.id}> en **${message.guild.name}**\n` +
+    `Los hits mencionarán <@&${HIT_ROLE_ID}>.\n\n` +
+    `Pega esto en \`webhook.txt\` de tu checker (reemplaza el que había):\n\`\`\`\n${hook.url}\n\`\`\`` +
+    (wrote ? '\n✅ Ya lo escribí yo en `webhook.txt`.' : '') +
+    '\nNo lo compartas: con este link cualquiera puede mandar mensajes al canal.',
+    'Webhook de drops'
+  )).then(() => true).catch(() => false);
+
+  // Sin DM no hay forma de darte el link sin escribir en el canal: se deshace y queda el canal anterior
+  if (!sent) {
+    await hook.delete('No se pudo mandar por DM').catch(() => {});
+    console.log(`!drophere de ${author.tag}: DMs cerrados, no se cambió el canal de drops.`);
+    return;
+  }
+
+  // Ahora sí: quita los webhooks de drops viejos para que solo quede este
   try {
     const hooks = await message.guild.fetchWebhooks();
     for (const w of hooks.values()) {
-      if (w.owner?.id === client.user.id && w.name === HOOK_NAME) await w.delete('Nuevo canal de drops').catch(() => {});
+      if (w.id !== hook.id && w.owner?.id === client.user.id && w.name === HOOK_NAME) {
+        await w.delete('Nuevo canal de drops').catch(() => {});
+      }
     }
   } catch {}
-
-  const hook = await channel.createWebhook({ name: HOOK_NAME, reason: `!drophere por ${message.author.tag}` });
   drops.set(message.guild.id, { channelId: channel.id, webhookId: hook.id });
-
-  const wrote = writeCheckerWebhook(hook.url);
-  let dmOk = false;
-  try {
-    await message.author.send({
-      embeds: [new EmbedBuilder()
-        .setColor(COLOR)
-        .setTitle('Webhook de drops')
-        .setDescription(
-          `Canal: <#${channel.id}> en **${message.guild.name}**\n\n` +
-          `Pega esto en \`webhook.txt\` de tu checker (reemplaza el que había):\n\`\`\`\n${hook.url}\n\`\`\`` +
-          (wrote ? '\n✅ Ya lo escribí yo en `webhook.txt`.' : '') +
-          '\nNo lo compartas: con este link cualquiera puede mandar mensajes al canal.'
-        )],
-    });
-    dmOk = true;
-  } catch {}
-
-  await message.delete().catch(() => {});
-  const note = await channel.send({
-    embeds: [new EmbedBuilder()
-      .setColor(COLOR)
-      .setDescription(
-        `📍 Los hits del checker caerán en este canal y mencionarán <@&${HIT_ROLE_ID}>.\n` +
-        (dmOk ? `${message.author}, te mandé el webhook por DM.` : `${message.author}, no pude mandarte DM: abre tus DMs y vuelve a usar \`!drophere\`.`) +
-        (wrote ? '\n`webhook.txt` actualizado.' : '')
-      )],
-    allowedMentions: { parse: [] },
-  });
-  setTimeout(() => note.delete().catch(() => {}), 15000);
 }
 
 // ---------------- relay de hits ----------------
@@ -326,7 +323,7 @@ client.on('messageCreate', async message => {
   if (message.content.trim().toLowerCase() === PREFIX + 'drophere') {
     try { await onDropHere(message); } catch (e) {
       console.error(e);
-      message.reply('No pude configurar el canal: ' + e.message).catch(() => {});
+      message.author.send(dmEmbed('No pude configurar el canal: ' + e.message)).catch(() => {});
     }
   }
 });
